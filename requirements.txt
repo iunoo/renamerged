@@ -1,0 +1,5 @@
+# requirements.txt
+pdfplumber
+PyPDF2
+colorama
+customtkinter

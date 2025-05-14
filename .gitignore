@@ -1,0 +1,40 @@
+# Python temporary files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# PyInstaller build files
+build/
+dist/
+*.spec
+
+# Log and output files
+log.txt
+ProcessedPDFs/
+
+# Virtual environment
+venv/
+.venv/
+
+# Editor temporary files
+*.swp
+*.swo
+.DS_Store
+*.bak
+
+# IDE files
+.vscode/
+.idea/
+
+# Other temporary files
+*.tmp
+*.temp
+
+*.exe
+dist/
+
+*.exe
+dist/
+*.log
+*.tmp
