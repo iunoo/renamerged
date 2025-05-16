@@ -121,10 +121,10 @@ def process_pdfs(input_directory):
 
 def main():
     print(Fore.MAGENTA + "==============================================")
-    print(Fore.CYAN + "✨ PDF Processor by Syahbandi ✨")
+    print(Fore.CYAN + "✨ PDF Processor by Mikhailovna ✨")
     print(Fore.CYAN + "📜 Script ini akan menggabungkan PDF berdasarkan ID TKU Penjual dan lawan transaksi")
-    print(Fore.CYAN + "🌐 Original Repositori : https://github.com/ssyahbandi/PDF_Renamer")
-    print(Fore.CYAN + "🖥️ Jika ada kendala silahkan hubungi saya di Telegram https://t.me/ssyahbandi")
+    print(Fore.CYAN + "🌐 Original Repositori : https://github.com/mikhailovnasy/renamerged")
+    print(Fore.CYAN + "🖥️ Jika ada kendala silahkan hubungi saya di Telegram https://t.me/prasasona")
     print(Fore.CYAN + "🎁 Donasi scan QRIS Link (CTRL + KLIK LINKNYA) : https://bit.ly/kiyuris")
     print(Fore.MAGENTA + "==============================================")
 
