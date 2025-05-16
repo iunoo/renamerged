@@ -40,9 +40,6 @@ class ModeSelectionComponent:
         ctk.CTkLabel(self.name_components_frame, text="Komponen Nama File (untuk Rename Saja):", font=("Roboto", 12),
                      text_color=self.colors["fg"]).grid(row=0, column=0, sticky="w", padx=(0, 10), pady=(0, 2))
 
-        ctk.CTkLabel(self.name_components_frame, text="Klik untuk memilih, lalu gunakan panah kiri/kanan untuk menggeser.", font=("Roboto", 10, "italic"),
-                     text_color="#BBBBBB").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=(0, 5))
-
         self.separator_frame = ctk.CTkFrame(self.name_components_frame, fg_color="transparent")
         self.separator_frame.grid(row=2, column=0, sticky="w", padx=(0, 10), pady=(0, 5))
         separator_label = ctk.CTkLabel(self.separator_frame, text="Pemisah Nama File PDF:", font=("Roboto", 12),
@@ -75,8 +72,11 @@ class ModeSelectionComponent:
                                                        font=("Roboto", 12), width=100, height=35, corner_radius=15)
         self.slash_replacement_menu.pack(side="left")
 
-        self.components_container = ctk.CTkFrame(self.name_components_frame, fg_color="transparent")
+        self.components_container = ctk.CTkFrame(self.name_components_frame, fg_color="transparent", border_width=2, border_color=self.colors["button_bg"])
         self.components_container.grid(row=4, column=0, columnspan=5, sticky="ew", padx=(10, 10))
+
+        ctk.CTkLabel(self.name_components_frame, text="Klik untuk memilih, lalu gunakan panah kiri/kanan untuk menggeser.", font=("Roboto", 10, "italic"),
+                     text_color="#BBBBBB").grid(row=5, column=0, sticky="w", padx=(0, 10), pady=(5, 0))
 
         self.component_order = [
             ("Nama Lawan Transaksi", self.settings["use_name"]),
@@ -172,6 +172,7 @@ class ModeSelectionComponent:
                 child.configure(fg_color="#1E3A8A", text_color="#FFFFFF")
         self.separator_menu.configure(fg_color="#1E3A8A", text_color="#FFFFFF")
         self.slash_replacement_menu.configure(fg_color="#1E3A8A", text_color="#FFFFFF")
+        self.components_container.configure(border_color=self.colors["button_bg"])
         for component in self.components:
             component.update_theme(colors)
         for tooltip in self.tooltips:

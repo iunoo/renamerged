@@ -14,7 +14,8 @@ def run_gui():
     ctk.set_appearance_mode("dark")
     ctk.set_default_color_theme("blue")
     root = ctk.CTk()
-    root.title("RENAMERGED - Rename & Merge PDFs")
+    VERSION = "1.0"  # Ganti dengan versi yang diinginkan
+    root.title(f"RENAMERGED v{VERSION} - Rename & Merge PDFs")
     root.geometry("1000x900")
     root.resizable(True, True)
     root.minsize(1000, 900)
@@ -32,8 +33,8 @@ class RenamergedGUI:
         self.output_path_var = tk.StringVar()
         self.progress_var = tk.DoubleVar(value=0)
         self.progress_percentage_var = tk.StringVar(value="0%")
-        self.separator_var = tk.StringVar(value="(spasi)")  # Ubah default ke "(spasi)"
-        self.slash_replacement_var = tk.StringVar(value="(spasi)")  # Ubah default ke "(spasi)"
+        self.separator_var = tk.StringVar(value="(spasi)")  # Ubah default ke "(spasi)")
+        self.slash_replacement_var = tk.StringVar(value="(spasi)")  # Ubah default ke "(spasi)")
 
         self.settings = {
             "use_name": tk.BooleanVar(value=True),
