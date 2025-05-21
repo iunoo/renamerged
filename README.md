@@ -121,6 +121,10 @@ Saya terbuka untuk masukan! Jika ada ide fitur baru atau bug, hubungi saya via T
 
 Terima kasih telah menggunakan Renamerged! Semoga aplikasi ini mempermudah pengelolaan dokumen PDF Anda. Jangan lupa *share* ke teman-teman yang membutuhkan.
 
+## Pertanyaan
+
+Silahkan hubungi saya di [sini](https:///t.me/prasasona)
+
 ## BONUS
 
 Aku ketika ngoding dan ga ada BUG bee like :
