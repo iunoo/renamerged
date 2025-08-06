@@ -6,6 +6,7 @@ from src.utils.settings_manager import SettingsManager
 from src.components.header import HeaderComponent
 from src.components.mode_selection import ModeSelectionComponent
 from src.components.file_input_output import FileInputOutputComponent
+from src.components.pdf_counter import PDFCounterComponent
 from src.components.file_list import FileListComponent
 from src.components.progress_bar import ProgressBarComponent
 from src.components.statistics import StatisticsComponent
@@ -18,9 +19,9 @@ def run_gui():
     root = ctk.CTk()
     VERSION = "2.0.3"  # Ganti dengan versi yang diinginkan
     root.title(f"RENAMERGED v{VERSION} - Rename & Merge PDFs")
-    root.geometry("1000x900")
+    root.geometry("1100x800")
     root.resizable(True, True)
-    root.minsize(1000, 900)
+    root.minsize(900, 700)
     app = RenamergedGUI(root)
     root.mainloop()
 
@@ -36,13 +37,12 @@ class RenamergedGUI:
         self.current_theme = saved_settings.get("theme", "dark")
         self.colors = self.theme.get_colors(self.current_theme)
         self.mode_var = ctk.StringVar(value=saved_settings.get("mode", "Rename dan Merge"))
-        self.input_path_var = tk.StringVar(value=saved_settings.get("last_input_directory", ""))
-        self.output_path_var = tk.StringVar(value=saved_settings.get("last_output_directory", ""))
+        # Path variables - not saved in user settings (session-specific)
+        self.input_path_var = tk.StringVar(value="")
+        self.output_path_var = tk.StringVar(value="")
         
-        # Setup auto-save untuk perubahan settings dengan throttling
+        # Setup auto-save untuk perubahan settings dengan throttling (exclude paths)
         self.mode_var.trace('w', lambda *args: self._throttled_save())
-        self.input_path_var.trace('w', lambda *args: self._throttled_save())
-        self.output_path_var.trace('w', lambda *args: self._throttled_save())
         self.progress_var = tk.DoubleVar(value=0)
         self.progress_percentage_var = tk.StringVar(value="0%")
         self.separator_var = tk.StringVar(value=saved_settings.get("separator", "-"))
@@ -66,45 +66,57 @@ class RenamergedGUI:
             if hasattr(var, 'trace'):  # Hanya untuk StringVar, BooleanVar, dll
                 var.trace('w', lambda *args: self._throttled_save())
 
-        self.main_frame = ctk.CTkFrame(self.root, fg_color="transparent")
-        self.main_frame.pack(expand=True, fill="both", padx=20, pady=20)
-
-        self.main_frame.grid_rowconfigure(0, weight=0)
-        self.main_frame.grid_rowconfigure(1, weight=0)
-        self.main_frame.grid_rowconfigure(2, weight=0)
-        self.main_frame.grid_rowconfigure(3, weight=0)
-        self.main_frame.grid_rowconfigure(4, weight=0)
-        self.main_frame.grid_rowconfigure(5, weight=0)
-        self.main_frame.grid_rowconfigure(6, weight=0)
-        self.main_frame.grid_rowconfigure(7, weight=0)
-        self.main_frame.grid_rowconfigure(8, weight=0)
-        self.main_frame.grid_rowconfigure(9, weight=0)
-        self.main_frame.grid_rowconfigure(10, weight=0)
-        self.main_frame.grid_rowconfigure(11, weight=0)
-        self.main_frame.grid_rowconfigure(12, weight=0)
-        self.main_frame.grid_rowconfigure(13, weight=0)
-        self.main_frame.grid_rowconfigure(14, weight=0)
-        self.main_frame.grid_rowconfigure(15, weight=0)
-        self.main_frame.grid_rowconfigure(16, weight=0)
+        # Create scrollable main container
+        self.main_frame = ctk.CTkScrollableFrame(
+            self.root, 
+            fg_color=self.colors["bg"],
+            scrollbar_fg_color=self.colors["surface"],
+            scrollbar_button_color=self.colors["primary"],
+            scrollbar_button_hover_color=self.colors["primary_hover"]
+        )
+        self.main_frame.pack(expand=True, fill="both", padx=self.theme.spacing["lg"], pady=self.theme.spacing["lg"])
+        
+        # Configure responsive grid
         self.main_frame.grid_columnconfigure(0, weight=1)
-        self.main_frame.grid_columnconfigure(1, weight=0)
 
         self.header = HeaderComponent(self.main_frame, self.colors, self.switch_theme)
-        self.mode_selection = ModeSelectionComponent(self.main_frame, self.colors, self.mode_var, self.settings, self.separator_var, self.slash_replacement_var)
+        self.mode_selection = ModeSelectionComponent(self.main_frame, self.colors, self.mode_var, self.settings, self.separator_var, self.slash_replacement_var, self)
         self.file_input_output = FileInputOutputComponent(self.main_frame, self.colors, self.input_path_var, self.output_path_var)
+        self.pdf_counter = PDFCounterComponent(self.main_frame, self.colors, self.input_path_var)
         self.file_list = FileListComponent(self.main_frame, self.colors, self.input_path_var)
         self.progress_bar = ProgressBarComponent(self.main_frame, self.colors, self.progress_var, self.progress_percentage_var)
         self.statistics = StatisticsComponent(self.main_frame, self.colors)
         self.output_location = OutputLocationComponent(self.main_frame, self.colors)
+        
+        # Create process button logic (but use the button in file_input_output)
         self.process_button = ProcessButtonComponent(
             self.main_frame, self.colors, self.input_path_var, self.output_path_var,
             self.mode_var, self.settings, self.progress_var, self.progress_percentage_var,
             self.statistics, self.output_location, self.mode_selection, self
         )
-
-        self.copyright_label = ctk.CTkLabel(self.main_frame, text="© 2025 Renamerged - All Rights Reserved",
-                                            font=("Roboto", 10), text_color=self.colors["fg"])
-        self.copyright_label.grid(row=16, column=0, columnspan=2, pady=(10, 20), sticky="s")
+        
+        # Connect the process command to the new button in file_input_output
+        self.file_input_output.set_process_command(self.process_button.process)
+        
+        # Add other components here (will be positioned later)
+        # Copyright footer - moved to bottom after all other components
+        self.footer_card = ctk.CTkFrame(
+            self.main_frame,
+            fg_color=self.colors["surface"],
+            border_width=1,
+            border_color=self.colors["border"],
+            corner_radius=12
+        )
+        self.footer_card.grid(row=14, column=0, sticky="ew", pady=(20, 16), padx=4)
+        
+        self.copyright_label = ctk.CTkLabel(
+            self.footer_card,
+            text="© 2025 Renamerged - Made with ❤️",
+            font=("Inter", 10),
+            text_color=self.colors["text_muted"],
+            anchor="center"
+        )
+        self.copyright_label.pack(pady=16, padx=24)
 
         self.root.bind("<Left>", lambda event: self.mode_selection.move_left(event))
         self.root.bind("<Right>", lambda event: self.mode_selection.move_right(event))
@@ -113,23 +125,39 @@ class RenamergedGUI:
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def switch_theme(self):
+        """Switch between dark and light themes"""
         self.current_theme = "light" if self.current_theme == "dark" else "dark"
         ctk.set_appearance_mode(self.current_theme)
         self.colors = self.theme.get_colors(self.current_theme)
-        self.root.configure(bg=self.colors["bg"])
+        
+        # Update main frame colors
         self.main_frame.configure(fg_color=self.colors["bg"])
+        
+        # Update footer
+        self.footer_card.configure(
+            fg_color=self.colors["surface"],
+            border_color=self.colors["border"]
+        )
+        self.copyright_label.configure(text_color=self.colors["text_muted"])
+        
+        # Update all components
         self.header.update_theme(self.colors)
         self.mode_selection.update_theme(self.colors)
         self.file_input_output.update_theme(self.colors)
-        self.file_list.update_theme(self.colors)
-        self.progress_bar.update_theme(self.colors)
-        self.statistics.update_theme(self.colors)
-        self.output_location.update_theme(self.colors)
-        self.process_button.update_theme(self.colors)
-        self.copyright_label.configure(text_color=self.colors["fg"])
+        self.pdf_counter.update_theme(self.colors)
         
-        # Auto-save setelah ganti tema (langsung tanpa throttling)
-        self.save_current_settings()
+        # Update other components if they have update_theme method
+        if hasattr(self.file_list, 'update_theme'):
+            self.file_list.update_theme(self.colors)
+        if hasattr(self.progress_bar, 'update_theme'):
+            self.progress_bar.update_theme(self.colors)
+        if hasattr(self.statistics, 'update_theme'):
+            self.statistics.update_theme(self.colors)
+        if hasattr(self.output_location, 'update_theme'):
+            self.output_location.update_theme(self.colors)
+        
+        # Save theme preference
+        self._throttled_save()
     
     def _throttled_save(self):
         """Save settings dengan delay untuk menghindari terlalu sering save"""
@@ -140,19 +168,18 @@ class RenamergedGUI:
         self._save_timer.start()
     
     def save_current_settings(self):
-        """Simpan settings saat ini ke file"""
+        """Simpan settings saat ini ke file (tanpa path yang bersifat session-specific)"""
         current_settings = {
             "theme": self.current_theme,
-            "mode": self.mode_var,
-            "last_input_directory": self.input_path_var,
-            "last_output_directory": self.output_path_var,
-            "separator": self.separator_var,
-            "slash_replacement": self.slash_replacement_var,
-            "use_name": self.settings["use_name"],
-            "use_date": self.settings["use_date"],
-            "use_reference": self.settings["use_reference"],
-            "use_faktur": self.settings["use_faktur"],
-            "component_order": self.settings.get("component_order", None)
+            "mode": self.mode_var.get() if hasattr(self.mode_var, 'get') else self.mode_var,
+            "separator": self.separator_var.get() if hasattr(self.separator_var, 'get') else self.separator_var,
+            "slash_replacement": self.slash_replacement_var.get() if hasattr(self.slash_replacement_var, 'get') else self.slash_replacement_var,
+            "use_name": self.settings["use_name"].get() if hasattr(self.settings["use_name"], 'get') else self.settings["use_name"],
+            "use_date": self.settings["use_date"].get() if hasattr(self.settings["use_date"], 'get') else self.settings["use_date"],
+            "use_reference": self.settings["use_reference"].get() if hasattr(self.settings["use_reference"], 'get') else self.settings["use_reference"],
+            "use_faktur": self.settings["use_faktur"].get() if hasattr(self.settings["use_faktur"], 'get') else self.settings["use_faktur"],
+            "component_order": self.mode_selection.get_component_order() if hasattr(self.mode_selection, 'get_component_order') else self.settings.get("component_order", None),
+            "settings_expanded": self.mode_selection.is_expanded if hasattr(self.mode_selection, 'is_expanded') else True
         }
         
         return self.settings_manager.save_settings(current_settings)

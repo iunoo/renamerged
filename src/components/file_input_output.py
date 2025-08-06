@@ -12,40 +12,157 @@ class FileInputOutputComponent:
         self.input_path_var = input_path_var
         self.output_path_var = output_path_var
 
-        # Input Folder
-        ctk.CTkLabel(self.parent, text="Pilih Folder Input PDF:", font=("Roboto", 12),
-                     text_color=self.colors["fg"]).grid(row=4, column=0, sticky="w", padx=10, pady=(10, 0))
-        self.input_frame = ctk.CTkFrame(self.parent, fg_color="transparent")
-        self.input_frame.grid(row=5, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
+        # File paths card
+        self.file_paths_card = ctk.CTkFrame(
+            self.parent,
+            fg_color=self.colors["surface"],
+            border_width=1,
+            border_color=self.colors["border"],
+            corner_radius=16
+        )
+        self.file_paths_card.grid(row=1, column=0, sticky="ew", pady=(0, 16), padx=4)
+        self.file_paths_card.grid_columnconfigure(0, weight=1)
+
+        # Card header
+        self.card_header = ctk.CTkLabel(
+            self.file_paths_card,
+            text="📁 Lokasi File",
+            font=("Inter", 18, "bold"),
+            text_color=self.colors["fg"],
+            anchor="w"
+        )
+        self.card_header.grid(row=0, column=0, sticky="ew", padx=24, pady=(20, 16))
+
+        # Input folder section
+        self.input_section = ctk.CTkFrame(self.file_paths_card, fg_color="transparent")
+        self.input_section.grid(row=1, column=0, sticky="ew", padx=24, pady=(0, 20))
+        self.input_section.grid_columnconfigure(0, weight=1)
+
+        self.input_label = ctk.CTkLabel(
+            self.input_section,
+            text="📂 Folder Input PDF",
+            font=("Inter", 13, "bold"),
+            text_color=self.colors["fg"],
+            anchor="w"
+        )
+        self.input_label.grid(row=0, column=0, sticky="w", pady=(0, 4))
+        
+        # Add instruction for input folder
+        self.input_instruction = ctk.CTkLabel(
+            self.input_section,
+            text="💡 Bisa langsung paste path lokasi PDF disini",
+            font=("Inter", 10, "italic"),
+            text_color=self.colors["text_muted"],
+            anchor="w"
+        )
+        self.input_instruction.grid(row=1, column=0, sticky="w", pady=(0, 8))
+
+        self.input_frame = ctk.CTkFrame(self.input_section, fg_color="transparent")
+        self.input_frame.grid(row=2, column=0, sticky="ew")
         self.input_frame.grid_columnconfigure(0, weight=1)
-        self.input_frame.grid_columnconfigure(1, weight=0)
-        self.input_entry = ctk.CTkEntry(self.input_frame, textvariable=self.input_path_var,
-                                        height=35, fg_color=self.colors["entry_bg"],
-                                        text_color=self.colors["entry_fg"], border_width=0,
-                                        corner_radius=10, font=("Roboto", 12), width=1000)
-        self.input_entry.grid(row=0, column=0, sticky="ew", padx=(0, 5))
-        self.browse_input_btn = ctk.CTkButton(self.input_frame, text="Browse", command=self.browse_input,
-                                              fg_color="#1E3A8A", text_color="#FFFFFF",
-                                              font=("Roboto", 12, "bold"), hover_color="#3B82F6",
-                                              width=120, height=35, border_width=0, corner_radius=15)
+
+        self.input_entry = ctk.CTkEntry(
+            self.input_frame,
+            textvariable=self.input_path_var,
+            height=44,
+            fg_color=self.colors["entry_bg"],
+            text_color=self.colors["entry_fg"],
+            border_width=1,
+            border_color=self.colors["border"],
+            corner_radius=12,
+            font=("Inter", 12),
+            placeholder_text="Pilih folder yang berisi file PDF..."
+        )
+        self.input_entry.grid(row=0, column=0, sticky="ew", padx=(0, 12))
+
+        self.browse_input_btn = ctk.CTkButton(
+            self.input_frame,
+            text="🔍 Browse",
+            command=self.browse_input,
+            fg_color=self.colors["primary"],
+            text_color="#FFFFFF",
+            font=("Inter", 12, "bold"),
+            hover_color=self.colors["primary_hover"],
+            width=100,
+            height=44,
+            border_width=0,
+            corner_radius=12
+        )
         self.browse_input_btn.grid(row=0, column=1)
 
-        # Output Folder
-        ctk.CTkLabel(self.parent, text="Pilih Folder Output PDF (Opsional):", font=("Roboto", 12),
-                     text_color=self.colors["fg"]).grid(row=7, column=0, sticky="w", padx=10, pady=(10, 0))
-        self.output_frame = ctk.CTkFrame(self.parent, fg_color="transparent")
-        self.output_frame.grid(row=8, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
+        # Output folder section
+        self.output_section = ctk.CTkFrame(self.file_paths_card, fg_color="transparent")
+        self.output_section.grid(row=2, column=0, sticky="ew", padx=24, pady=(0, 24))
+        self.output_section.grid_columnconfigure(0, weight=1)
+
+        self.output_label = ctk.CTkLabel(
+            self.output_section,
+            text="💾 Folder Output (Opsional)",
+            font=("Inter", 13, "bold"),
+            text_color=self.colors["fg"],
+            anchor="w"
+        )
+        self.output_label.grid(row=0, column=0, sticky="w", pady=(0, 10))
+
+        self.output_frame = ctk.CTkFrame(self.output_section, fg_color="transparent")
+        self.output_frame.grid(row=1, column=0, sticky="ew")
         self.output_frame.grid_columnconfigure(0, weight=1)
-        self.output_entry = ctk.CTkEntry(self.output_frame, textvariable=self.output_path_var,
-                                         height=35, fg_color=self.colors["entry_bg"],
-                                         text_color=self.colors["entry_fg"], border_width=0,
-                                         corner_radius=10, font=("Roboto", 12), width=1000)
-        self.output_entry.grid(row=0, column=0, sticky="ew", padx=(0, 5))
-        self.browse_output_btn = ctk.CTkButton(self.output_frame, text="Browse", command=self.browse_output,
-                                               fg_color="#1E3A8A", text_color="#FFFFFF",
-                                               font=("Roboto", 12, "bold"), hover_color="#3B82F6",
-                                               width=120, height=35, border_width=0, corner_radius=15)
+
+        self.output_entry = ctk.CTkEntry(
+            self.output_frame,
+            textvariable=self.output_path_var,
+            height=44,
+            fg_color=self.colors["entry_bg"],
+            text_color=self.colors["entry_fg"],
+            border_width=1,
+            border_color=self.colors["border"],
+            corner_radius=12,
+            font=("Inter", 12),
+            placeholder_text="Default: ProcessedPDFs di folder input"
+        )
+        self.output_entry.grid(row=0, column=0, sticky="ew", padx=(0, 12))
+
+        self.browse_output_btn = ctk.CTkButton(
+            self.output_frame,
+            text="🔍 Browse",
+            command=self.browse_output,
+            fg_color=self.colors["primary"],
+            text_color="#FFFFFF",
+            font=("Inter", 12, "bold"),
+            hover_color=self.colors["primary_hover"],
+            width=100,
+            height=44,
+            border_width=0,
+            corner_radius=12
+        )
         self.browse_output_btn.grid(row=0, column=1)
+
+        # Process button section - aligned with browse buttons
+        self.process_section = ctk.CTkFrame(self.file_paths_card, fg_color="transparent")
+        self.process_section.grid(row=3, column=0, sticky="ew", padx=24, pady=(16, 24))
+        self.process_section.grid_columnconfigure(0, weight=1)
+        self.process_section.grid_columnconfigure(1, weight=0)
+
+        # Process button frame for better alignment
+        self.process_frame = ctk.CTkFrame(self.process_section, fg_color="transparent")
+        self.process_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 0))
+        self.process_frame.grid_columnconfigure(0, weight=1)
+        
+        # Large process button - centered but prominent
+        self.process_btn = ctk.CTkButton(
+            self.process_frame,
+            text="🚀 Mulai Proses",
+            command=None,  # Will be set by main GUI
+            fg_color=self.colors["primary"],
+            text_color="#FFFFFF",
+            font=("Inter", 16, "bold"),
+            hover_color=self.colors["primary_hover"],
+            width=200,
+            height=56,
+            border_width=0,
+            corner_radius=16
+        )
+        self.process_btn.grid(row=0, column=0, pady=8)
 
     def browse_input(self):
         popup = ctk.CTkToplevel(self.parent)
@@ -122,13 +239,51 @@ class FileInputOutputComponent:
             self.output_path_var.set(folder)
 
     def update_theme(self, colors):
+        """Update theme colors for all components"""
         self.colors = colors
-        for child in self.parent.winfo_children():
-            if isinstance(child, ctk.CTkLabel) and child != self.parent.winfo_children()[0]:
-                child.configure(text_color=self.colors["fg"])
-        self.input_frame.configure(fg_color="transparent")
-        self.input_entry.configure(fg_color=self.colors["entry_bg"], text_color=self.colors["entry_fg"])
-        self.browse_input_btn.configure(fg_color="#1E3A8A", text_color=self.colors["button_fg"], hover_color="#3B82F6")
-        self.output_frame.configure(fg_color="transparent")
-        self.output_entry.configure(fg_color=self.colors["entry_bg"], text_color=self.colors["entry_fg"])
-        self.browse_output_btn.configure(fg_color="#1E3A8A", text_color=self.colors["button_fg"], hover_color="#3B82F6")
+        
+        # Update card styling
+        self.file_paths_card.configure(
+            fg_color=self.colors["surface"],
+            border_color=self.colors["border"]
+        )
+        
+        # Update labels
+        self.card_header.configure(text_color=self.colors["fg"])
+        self.input_label.configure(text_color=self.colors["fg"])
+        self.input_instruction.configure(text_color=self.colors["text_muted"])
+        self.output_label.configure(text_color=self.colors["fg"])
+        
+        # Update entries
+        self.input_entry.configure(
+            fg_color=self.colors["entry_bg"],
+            text_color=self.colors["entry_fg"],
+            border_color=self.colors["border"]
+        )
+        self.output_entry.configure(
+            fg_color=self.colors["entry_bg"],
+            text_color=self.colors["entry_fg"],
+            border_color=self.colors["border"]
+        )
+        
+        # Update buttons
+        self.browse_input_btn.configure(
+            fg_color=self.colors["primary"],
+            hover_color=self.colors["primary_hover"]
+        )
+        self.browse_output_btn.configure(
+            fg_color=self.colors["primary"],
+            hover_color=self.colors["primary_hover"]
+        )
+        
+        # Update process button if exists
+        if hasattr(self, 'process_btn'):
+            self.process_btn.configure(
+                fg_color=self.colors["primary"],
+                hover_color=self.colors["primary_hover"]
+            )
+    
+    def set_process_command(self, command):
+        """Set command for the process button"""
+        if hasattr(self, 'process_btn'):
+            self.process_btn.configure(command=command)

@@ -19,9 +19,8 @@ class SettingsManager:
                 "Referensi",
                 "Nomor Faktur Pajak"
             ],
-            "last_input_directory": "",
-            "last_output_directory": "",
-            "theme": "dark"
+            "theme": "dark",
+            "settings_expanded": True
         }
     
     def load_settings(self, log_callback=None):

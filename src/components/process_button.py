@@ -22,11 +22,8 @@ class ProcessButtonComponent:
         self.mode_selection = mode_selection
         self.gui = gui
 
-        self.process_btn = ctk.CTkButton(self.parent, text="Proses", command=self.process,
-                                         fg_color="#1E3A8A", text_color="#FFFFFF",
-                                         font=("Roboto", 12, "bold"), hover_color="#3B82F6",
-                                         width=120, height=35, border_width=0, corner_radius=15)
-        self.process_btn.grid(row=14, column=0, columnspan=2, pady=(20, 40))
+        # No UI creation - this component now only provides logic
+        # The actual button is created in FileInputOutputComponent
 
     def process(self):
         input_dir = self.input_path_var.get()
@@ -40,7 +37,7 @@ class ProcessButtonComponent:
             messagebox.showerror("Error", "Folder input tidak valid! Pilih folder yang benar.")
             return
 
-        self.process_btn.configure(state="disabled")
+        self.set_button_state("disabled")
 
         if not output_dir or output_dir.strip() == "":
             output_dir = os.path.join(input_dir, "ProcessedPDFs")
@@ -51,7 +48,7 @@ class ProcessButtonComponent:
         for key in required_keys:
             if not hasattr(self.settings.get(key), 'get'):
                 messagebox.showerror("Error", f"Pengaturan {key} tidak valid!")
-                self.process_btn.configure(state="normal")
+                self.set_button_state("normal")
                 return
 
         self.settings["component_order"] = self.mode_selection.get_component_order()
@@ -77,7 +74,7 @@ class ProcessButtonComponent:
             
             if user_choice == "cancel":
                 log_message("Proses dibatalkan oleh user karena filename terlalu panjang", Fore.YELLOW, log_callback=self.log_callback)
-                self.process_btn.configure(state="normal")
+                self.set_button_state("normal")
                 return
             elif user_choice == "ok":
                 # Set default max length (150 karakter - apply for all)
@@ -195,3 +192,8 @@ class ProcessButtonComponent:
                    f"• Periksa file log untuk detail\n"
                    f"• Hubungi developer jika masalah berlanjut\n\n"
                    f"Detail: {str(exception)}")
+
+    def set_button_state(self, state):
+        """Enable or disable the process button through GUI reference"""
+        if hasattr(self.gui, 'file_input_output') and hasattr(self.gui.file_input_output, 'process_btn'):
+            self.gui.file_input_output.process_btn.configure(state=state)
