@@ -44,7 +44,8 @@ def process_pdfs(input_directory, output_directory=None, progress_callback=None,
             os.makedirs(idtku_folder, exist_ok=True)
 
             # Buat nama file berdasarkan pengaturan
-            new_filename = generate_filename(partner_name, faktur_number, date, reference, settings, component_order, separator, slash_replacement)
+            max_length = settings.get("max_filename_length", None)
+            new_filename = generate_filename(partner_name, faktur_number, date, reference, settings, component_order, separator, slash_replacement, max_length)
             destination_path = os.path.join(idtku_folder, new_filename)
 
             # Salin file dengan nama unik

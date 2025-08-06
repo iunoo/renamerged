@@ -17,6 +17,7 @@ class HeaderComponent:
         self.top_button_frame.grid(row=1, column=1, sticky="e", pady=(0, 10))
         self.top_button_frame.grid_columnconfigure(0, weight=0)
         self.top_button_frame.grid_columnconfigure(1, weight=0)
+        self.top_button_frame.grid_columnconfigure(2, weight=0)
 
         self.donate_btn = ctk.CTkButton(self.top_button_frame, text="Donasi", command=self.open_donate_link,
                                         fg_color="#E63946", text_color="#FFFFFF",  # Warna merah
@@ -24,18 +25,28 @@ class HeaderComponent:
                                         width=120, height=35, border_width=0, corner_radius=15)
         self.donate_btn.grid(row=0, column=0, padx=5)
 
+        self.contact_btn = ctk.CTkButton(self.top_button_frame, text="Hubungi Dev", command=self.open_contact_link,
+                                        fg_color="#25D366", text_color="#FFFFFF",  # Warna hijau WhatsApp
+                                        font=("Roboto", 12, "bold"), hover_color="#1DA851",  # Hover hijau lebih gelap
+                                        width=120, height=35, border_width=0, corner_radius=15)
+        self.contact_btn.grid(row=0, column=1, padx=5)
+
         self.theme_btn = ctk.CTkButton(self.top_button_frame, text="Ganti Tema", command=self.toggle_theme_callback,
                                        fg_color="#1E3A8A", text_color="#FFFFFF",
                                        font=("Roboto", 12, "bold"), hover_color="#3B82F6",
                                        width=120, height=35, border_width=0, corner_radius=15)
-        self.theme_btn.grid(row=0, column=1, padx=5)
+        self.theme_btn.grid(row=0, column=2, padx=5)
 
     def open_donate_link(self):
         webbrowser.open("https://bit.ly/kiyuris")
+    
+    def open_contact_link(self):
+        webbrowser.open("https://t.me/iunoin")
 
     def update_theme(self, colors):
         self.colors = colors
         self.title_label.configure(text_color=self.colors["fg"])
         self.top_button_frame.configure(fg_color="transparent")
         self.donate_btn.configure(fg_color="#E63946", text_color="#FFFFFF", hover_color="#D00000")  # Tetap merah
+        self.contact_btn.configure(fg_color="#25D366", text_color="#FFFFFF", hover_color="#1DA851")  # Tetap hijau
         self.theme_btn.configure(fg_color="#1E3A8A", text_color=self.colors["button_fg"], hover_color="#3B82F6")

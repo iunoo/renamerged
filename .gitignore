@@ -26,15 +26,18 @@ venv/
 # IDE files
 .vscode/
 .idea/
+.claude/
 
 # Other temporary files
 *.tmp
 *.temp
-
-*.exe
-dist/
-
-*.exe
-dist/
 *.log
-*.tmp
+
+# User settings and test files
+user_settings.json
+test pdf/
+
+# Build files
+*.exe
+dist/
+build/

@@ -19,6 +19,10 @@ Aplikasi ini sangat cocok untuk Anda yang sering menangani dokumen pajak, transa
 - **GUI Modern dan Modular**: Antarmuka grafis yang intuitif dengan tombol rounded, progress bar, dan desain futuristik.
 - **Mode Pemrosesan Fleksibel**: Pilih "Rename Saja" (tanpa merge) atau "Rename dan Merge" (rename PLUS merge file yang sama).
 - **Kustomisasi Nama File**: Pada mode "Rename Saja", pilih komponen nama file seperti Nama Lawan Transaksi, Tanggal Faktur Pajak, Referensi, atau Nomor Faktur Pajak.
+- **Smart Filename Management**: Otomatis memotong referensi yang terlalu panjang dengan visual delimiter `{}` untuk menjaga kompatibilitas Windows.
+- **Real-time Settings Persistence**: Pengaturan user (tema, mode, direktori, dll) disimpan otomatis secara real-time dan dimuat kembali saat aplikasi dibuka.
+- **Advanced Error Handling**: Pesan error yang jelas dengan solusi praktis untuk berbagai masalah umum.
+- **Filename Length Warning**: Peringatan otomatis jika nama file terlalu panjang dengan opsi penyesuaian.
 - **Pratinjau File PDF**: Lihat daftar file PDF sebelum diproses untuk memastikan file yang tepat.
 - **Organisasi File**: Hasil disimpan di folder `ProcessedPDFs`, diorganisir berdasarkan ID TKU Penjual.
 - **Validasi File PDF**: Memeriksa file PDF untuk memastikan tidak ada yang korup sebelum diproses.
@@ -49,7 +53,7 @@ Untuk menjalankan source code:
 Clone repository ini untuk mendapatkan source code:
 
 ```
-git clone https://github.com/mikhailovnasy/renamerged.git
+git clone https://github.com/iunoo/renamerged
 ```
 
 ## Cara Pakai
@@ -57,7 +61,7 @@ git clone https://github.com/mikhailovnasy/renamerged.git
 1. **Clone Repository**:
 
    ```
-   git clone https://github.com/mikhailovnasy/renamerged.git
+   git clone https://github.com/iunoo/renamerged
    cd renamerged
    ```
 
@@ -106,8 +110,11 @@ git clone https://github.com/mikhailovnasy/renamerged.git
 ## Catatan Penting
 
 - **Keamanan File**: Aplikasi ini aman digunakan. Jika Windows Defender memblokir, tambahkan ke *exclusion* di *Virus & Threat Protection*.
+- **Real-time User Settings**: Pengaturan user disimpan otomatis secara real-time di file `user_settings.json` dengan throttling system untuk performa optimal. File auto-generate jika tidak ada.
+- **Smart Filename Handling**: Aplikasi otomatis menangani referensi panjang dan memberikan peringatan untuk nama file yang melebihi batas Windows (260 karakter).
+- **Error Recovery**: Jika terjadi error, aplikasi memberikan pesan yang jelas dengan solusi praktis untuk memperbaiki masalah.
 - **Log**: Log aktivitas disimpan di `misc/log.txt` untuk debugging.
-- **Kendala**: Jika ada masalah, hubungi saya di Telegram.
+- **Kendala**: Jika ada masalah, hubungi saya di [Telegram](https://t.me/iunoin) atau gunakan tombol "Hubungi Dev" di aplikasi.
 
 ## Donasi
 
@@ -115,7 +122,7 @@ Jika Renamerged membantu Anda, dukung pengembangan proyek ini dengan donasi via 
 
 ## Kontribusi dan Feedback
 
-Saya terbuka untuk masukan! Jika ada ide fitur baru atau bug, hubungi saya via Telegram atau buka *issue* di repository ini.
+Saya terbuka untuk masukan! Jika ada ide fitur baru atau bug, hubungi saya di [Telegram](https://t.me/iunoin) atau buka *issue* di repository ini.
 
 ## Terima Kasih
 
@@ -123,7 +130,7 @@ Terima kasih telah menggunakan Renamerged! Semoga aplikasi ini mempermudah penge
 
 ## Pertanyaan
 
-Silahkan hubungi saya di [sini](https:///t.me/prasasona)
+Silahkan hubungi saya di [sini](https://t.me/iunoin)
 
 ## BONUS
 

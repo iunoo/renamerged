@@ -1,6 +1,8 @@
 import customtkinter as ctk
 import tkinter as tk
+import threading
 from src.utils.styles import Theme
+from src.utils.settings_manager import SettingsManager
 from src.components.header import HeaderComponent
 from src.components.mode_selection import ModeSelectionComponent
 from src.components.file_input_output import FileInputOutputComponent
@@ -14,7 +16,7 @@ def run_gui():
     ctk.set_appearance_mode("dark")
     ctk.set_default_color_theme("blue")
     root = ctk.CTk()
-    VERSION = "1.0"  # Ganti dengan versi yang diinginkan
+    VERSION = "2.0.3"  # Ganti dengan versi yang diinginkan
     root.title(f"RENAMERGED v{VERSION} - Rename & Merge PDFs")
     root.geometry("1000x900")
     root.resizable(True, True)
@@ -26,23 +28,43 @@ class RenamergedGUI:
     def __init__(self, root):
         self.root = root
         self.theme = Theme()
-        self.current_theme = "dark"
+        self.settings_manager = SettingsManager()
+        
+        # Load user settings
+        saved_settings = self.settings_manager.load_settings()
+        
+        self.current_theme = saved_settings.get("theme", "dark")
         self.colors = self.theme.get_colors(self.current_theme)
-        self.mode_var = ctk.StringVar(value="Rename dan Merge")
-        self.input_path_var = tk.StringVar()
-        self.output_path_var = tk.StringVar()
+        self.mode_var = ctk.StringVar(value=saved_settings.get("mode", "Rename dan Merge"))
+        self.input_path_var = tk.StringVar(value=saved_settings.get("last_input_directory", ""))
+        self.output_path_var = tk.StringVar(value=saved_settings.get("last_output_directory", ""))
+        
+        # Setup auto-save untuk perubahan settings dengan throttling
+        self.mode_var.trace('w', lambda *args: self._throttled_save())
+        self.input_path_var.trace('w', lambda *args: self._throttled_save())
+        self.output_path_var.trace('w', lambda *args: self._throttled_save())
         self.progress_var = tk.DoubleVar(value=0)
         self.progress_percentage_var = tk.StringVar(value="0%")
-        self.separator_var = tk.StringVar(value="(spasi)")  # Ubah default ke "(spasi)")
-        self.slash_replacement_var = tk.StringVar(value="(spasi)")  # Ubah default ke "(spasi)")
+        self.separator_var = tk.StringVar(value=saved_settings.get("separator", "-"))
+        self.slash_replacement_var = tk.StringVar(value=saved_settings.get("slash_replacement", "_"))
+        
+        # Auto-save untuk separator dan slash replacement dengan throttling
+        self.separator_var.trace('w', lambda *args: self._throttled_save())
+        self.slash_replacement_var.trace('w', lambda *args: self._throttled_save())
 
         self.settings = {
-            "use_name": tk.BooleanVar(value=True),
-            "use_date": tk.BooleanVar(value=True),
-            "use_reference": tk.BooleanVar(value=True),
-            "use_faktur": tk.BooleanVar(value=True),
-            "component_order": None
+            "use_name": tk.BooleanVar(value=saved_settings.get("use_name", True)),
+            "use_date": tk.BooleanVar(value=saved_settings.get("use_date", True)),
+            "use_reference": tk.BooleanVar(value=saved_settings.get("use_reference", True)),
+            "use_faktur": tk.BooleanVar(value=saved_settings.get("use_faktur", True)),
+            "component_order": saved_settings.get("component_order", None)
         }
+        
+        # Auto-save untuk checkbox settings dengan throttling
+        self._save_timer = None
+        for key, var in self.settings.items():
+            if hasattr(var, 'trace'):  # Hanya untuk StringVar, BooleanVar, dll
+                var.trace('w', lambda *args: self._throttled_save())
 
         self.main_frame = ctk.CTkFrame(self.root, fg_color="transparent")
         self.main_frame.pack(expand=True, fill="both", padx=20, pady=20)
@@ -86,6 +108,9 @@ class RenamergedGUI:
 
         self.root.bind("<Left>", lambda event: self.mode_selection.move_left(event))
         self.root.bind("<Right>", lambda event: self.mode_selection.move_right(event))
+        
+        # Setup window close handler untuk save settings
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def switch_theme(self):
         self.current_theme = "light" if self.current_theme == "dark" else "dark"
@@ -102,3 +127,44 @@ class RenamergedGUI:
         self.output_location.update_theme(self.colors)
         self.process_button.update_theme(self.colors)
         self.copyright_label.configure(text_color=self.colors["fg"])
+        
+        # Auto-save setelah ganti tema (langsung tanpa throttling)
+        self.save_current_settings()
+    
+    def _throttled_save(self):
+        """Save settings dengan delay untuk menghindari terlalu sering save"""
+        if self._save_timer:
+            self._save_timer.cancel()
+        
+        self._save_timer = threading.Timer(1.0, self.save_current_settings)  # Delay 1 detik
+        self._save_timer.start()
+    
+    def save_current_settings(self):
+        """Simpan settings saat ini ke file"""
+        current_settings = {
+            "theme": self.current_theme,
+            "mode": self.mode_var,
+            "last_input_directory": self.input_path_var,
+            "last_output_directory": self.output_path_var,
+            "separator": self.separator_var,
+            "slash_replacement": self.slash_replacement_var,
+            "use_name": self.settings["use_name"],
+            "use_date": self.settings["use_date"],
+            "use_reference": self.settings["use_reference"],
+            "use_faktur": self.settings["use_faktur"],
+            "component_order": self.settings.get("component_order", None)
+        }
+        
+        return self.settings_manager.save_settings(current_settings)
+    
+    def on_closing(self):
+        """Handler ketika aplikasi ditutup - save settings terlebih dahulu"""
+        try:
+            # Cancel any pending timer and save immediately
+            if self._save_timer:
+                self._save_timer.cancel()
+            self.save_current_settings()
+        except Exception as e:
+            print(f"Error saving settings on close: {str(e)}")
+        finally:
+            self.root.destroy()
