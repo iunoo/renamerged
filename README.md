@@ -75,17 +75,15 @@ git clone https://github.com/iunoo/renamerged
    ```
 
 3. **▶️ Jalankan Aplikasi**: Jalankan aplikasi tanpa jendela CMD:
-
-   ```bash
-   pythonw main/main.pyw
-   ```
-
-   atau
    
    ```bash
    python main.py
    ```
-
+   atau 
+   
+   ```bash
+   Klik 2x pada file "main.pyw"
+   ```
 
 5. **🎯 Gunakan Aplikasi**:
 
