@@ -80,7 +80,14 @@ git clone https://github.com/iunoo/renamerged
    pythonw main/main.pyw
    ```
 
-4. **🎯 Gunakan Aplikasi**:
+   atau
+   
+   ```bash
+   python main.py
+   ```
+
+
+5. **🎯 Gunakan Aplikasi**:
 
    - 🎛️ Pilih mode pemrosesan: "Rename Saja" atau "Rename dan Merge".
    - ✅ Jika memilih "Rename Saja", centang komponen nama file (Nama Lawan Transaksi, Tanggal Faktur Pajak, dll.) dan atur urutannya dengan drag & drop atau panah ←/→.
