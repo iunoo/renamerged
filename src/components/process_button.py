@@ -263,7 +263,7 @@ class ProcessButtonComponent:
             percentage = 40 + (current / max(total_to_merge, 1)) * 40
         else:  # finalizing
             if total_to_finalize > 0:
-                percentage = 80 + (current / total_to_finalize) * 20
+                percentage = 80 + (current / max(total_to_finalize, 1)) * 20
             else:
                 percentage = 100  # If no finalization needed, go to 100%
 

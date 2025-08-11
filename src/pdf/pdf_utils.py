@@ -2,7 +2,7 @@ import pdfplumber
 import re
 import os
 import shutil
-from pypdf import PdfWriter
+from pypdf import PdfWriter, PdfReader
 from src.utils.utils import log_message, Fore
 
 def validate_pdf(pdf_path):
@@ -343,17 +343,27 @@ def merge_pdfs(pdf_paths, output_path, log_callback=None):
         raise
         
     finally:
-        # Explicitly close all resources
+        # Explicitly close all resources in reverse order
+        # Close all PDF readers first
+        for reader in pdf_readers:
+            try:
+                # Close stream if it exists
+                if hasattr(reader, 'stream') and reader.stream:
+                    reader.stream.close()
+                # Close reader if it has close method
+                if hasattr(reader, 'close'):
+                    reader.close()
+            except Exception as e:
+                if log_callback:
+                    log_message(f"⚠️ Error closing PDF reader: {str(e)}", Fore.YELLOW, log_callback=log_callback)
+                
+        # Clear the readers list to free memory references
+        pdf_readers.clear()
+        
+        # Close merger last
         if merger:
             try:
                 merger.close()
-            except:
-                pass
-                
-        # Close all PDF readers
-        for reader in pdf_readers:
-            try:
-                if hasattr(reader, 'stream') and reader.stream:
-                    reader.stream.close()
-            except:
-                pass
+            except Exception as e:
+                if log_callback:
+                    log_message(f"⚠️ Error closing PDF merger: {str(e)}", Fore.YELLOW, log_callback=log_callback)

@@ -252,6 +252,7 @@ class RenamergedGUI:
         except Exception as e:
             # Use logging instead of print for GUI apps
             try:
+                from src.utils.utils import log_message, Fore
                 log_message(f"Error during cleanup: {str(e)}", Fore.RED)
             except:
                 pass
