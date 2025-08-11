@@ -17,7 +17,7 @@ def run_gui():
     ctk.set_appearance_mode("dark")
     ctk.set_default_color_theme("blue")
     root = ctk.CTk()
-    VERSION = "2.0.3"  # Ganti dengan versi yang diinginkan
+    VERSION = "2.1.0"  # Ganti dengan versi yang diinginkan
     root.title(f"RENAMERGED v{VERSION} - Rename & Merge PDFs")
     root.geometry("1100x800")
     root.resizable(True, True)
