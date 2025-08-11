@@ -1,8 +1,9 @@
 import customtkinter as ctk
 import tkinter as tk
 import os
-from threading import Thread
 import time
+import threading
+from threading import Thread
 
 class PDFCounterComponent:
     def __init__(self, parent, colors, input_path_var):
@@ -58,13 +59,23 @@ class PDFCounterComponent:
         )
         self.status_indicator.grid(row=0, column=2, sticky="e")
 
+        # Thread management
+        self.check_thread = None
+        self.stop_flag = threading.Event()
+        
         # Bind to path changes
-        self.input_path_var.trace('w', lambda *args: self.schedule_check())
+        self.trace_id = self.input_path_var.trace('w', lambda *args: self.schedule_check())
         
     def schedule_check(self):
         """Schedule PDF count check with debouncing"""
-        if self.check_thread and self.check_thread.is_alive():
+        if self.stop_flag.is_set():
             return
+            
+        # Cancel existing thread if running
+        if self.check_thread and self.check_thread.is_alive():
+            # Signal existing thread to stop, but don't wait
+            # New thread will handle the latest request
+            pass
             
         # Small delay to avoid rapid checking while user is typing
         self.check_thread = Thread(target=self._delayed_check, daemon=True)
@@ -72,15 +83,26 @@ class PDFCounterComponent:
     
     def _delayed_check(self):
         """Delayed check with debouncing"""
-        time.sleep(0.5)  # Wait 500ms before checking
-        self.check_pdf_count()
+        # Check for stop signal during delay
+        for _ in range(5):  # 5 x 100ms = 500ms total
+            if self.stop_flag.is_set():
+                return
+            time.sleep(0.1)
+        
+        # Check again before proceeding
+        if not self.stop_flag.is_set():
+            self.check_pdf_count()
     
     def check_pdf_count(self):
         """Check and update PDF count for current input path"""
+        if self.stop_flag.is_set():
+            return
+            
         current_path = self.input_path_var.get().strip()
         
         if not current_path:
-            self.update_display("📁 Pilih folder input terlebih dahulu untuk melihat jumlah PDF", "⏳", self.colors["text_muted"])
+            if not self.stop_flag.is_set():
+                self.update_display("📁 Pilih folder input terlebih dahulu untuk melihat jumlah PDF", "⏳", self.colors["text_muted"])
             return
             
         if current_path == self.last_checked_path:
@@ -89,17 +111,27 @@ class PDFCounterComponent:
         self.last_checked_path = current_path
         
         if not os.path.exists(current_path):
-            self.update_display("❌ Folder tidak ditemukan - Periksa path yang dimasukkan", "⚠️", self.colors["danger"])
+            if not self.stop_flag.is_set():
+                self.update_display("❌ Folder tidak ditemukan - Periksa path yang dimasukkan", "⚠️", self.colors["danger"])
             return
             
         if not os.path.isdir(current_path):
-            self.update_display("❌ Path bukan folder yang valid - Pilih folder, bukan file", "⚠️", self.colors["danger"])
+            if not self.stop_flag.is_set():
+                self.update_display("❌ Path bukan folder yang valid - Pilih folder, bukan file", "⚠️", self.colors["danger"])
             return
         
         try:
+            # Check for stop signal before file operations
+            if self.stop_flag.is_set():
+                return
+                
             # Count PDF files
             pdf_files = [f for f in os.listdir(current_path) if f.lower().endswith('.pdf')]
             count = len(pdf_files)
+            
+            # Check for stop signal before updating display
+            if self.stop_flag.is_set():
+                return
             
             if count == 0:
                 self.update_display("⚠️ Tidak ada file PDF ditemukan di folder ini", "❌", self.colors["warning"])
@@ -111,13 +143,32 @@ class PDFCounterComponent:
         except PermissionError:
             self.update_display("❌ Tidak ada akses ke folder", "🔒", self.colors["danger"])
         except Exception as e:
-            self.update_display("❌ Error membaca folder", "⚠️", self.colors["danger"])
+            if not self.stop_flag.is_set():
+                self.update_display("❌ Error membaca folder", "⚠️", self.colors["danger"])
+    
+    def stop_monitoring(self):
+        """Stop PDF monitoring and clean up resources"""
+        self.stop_flag.set()
+        
+        # Clean up trace callback
+        try:
+            self.input_path_var.trace_vdelete('w', self.trace_id)
+        except:
+            pass
+        
+        # Wait for thread to finish
+        if self.check_thread and self.check_thread.is_alive():
+            self.check_thread.join(timeout=1.0)
     
     def update_display(self, text, icon, color):
         """Update the display with new information"""
+        if self.stop_flag.is_set():
+            return
+            
         def update_ui():
-            self.counter_label.configure(text=text, text_color=color)
-            self.status_indicator.configure(text=icon)
+            if not self.stop_flag.is_set():
+                self.counter_label.configure(text=text, text_color=color)
+                self.status_indicator.configure(text=icon)
         
         # Schedule UI update on main thread
         self.parent.after(0, update_ui)

@@ -41,16 +41,34 @@ class RenamergedGUI:
         self.input_path_var = tk.StringVar(value="")
         self.output_path_var = tk.StringVar(value="")
         
+        # Auto-save untuk checkbox settings dengan throttling
+        self._save_timer = None
+        self._save_timer_lock = threading.Lock()
+        self._cleanup_done = False
+        self._background_threads = []  # Track background threads
+        self._trace_ids = []  # Track trace IDs for cleanup
+        
+        # Setup trace callbacks with cleanup tracking
+        def create_trace_callback(callback_func):
+            def wrapper(*args):
+                if not self._cleanup_done:
+                    callback_func()
+            return wrapper
+        
         # Setup auto-save untuk perubahan settings dengan throttling (exclude paths)
-        self.mode_var.trace('w', lambda *args: self._throttled_save())
+        trace_id = self.mode_var.trace('w', create_trace_callback(self._throttled_save))
+        self._trace_ids.append((self.mode_var, trace_id))
+        
         self.progress_var = tk.DoubleVar(value=0)
         self.progress_percentage_var = tk.StringVar(value="0%")
         self.separator_var = tk.StringVar(value=saved_settings.get("separator", "-"))
         self.slash_replacement_var = tk.StringVar(value=saved_settings.get("slash_replacement", "_"))
         
         # Auto-save untuk separator dan slash replacement dengan throttling
-        self.separator_var.trace('w', lambda *args: self._throttled_save())
-        self.slash_replacement_var.trace('w', lambda *args: self._throttled_save())
+        trace_id = self.separator_var.trace('w', create_trace_callback(self._throttled_save))
+        self._trace_ids.append((self.separator_var, trace_id))
+        trace_id = self.slash_replacement_var.trace('w', create_trace_callback(self._throttled_save))
+        self._trace_ids.append((self.slash_replacement_var, trace_id))
 
         self.settings = {
             "use_name": tk.BooleanVar(value=saved_settings.get("use_name", True)),
@@ -60,11 +78,10 @@ class RenamergedGUI:
             "component_order": saved_settings.get("component_order", None)
         }
         
-        # Auto-save untuk checkbox settings dengan throttling
-        self._save_timer = None
         for key, var in self.settings.items():
             if hasattr(var, 'trace'):  # Hanya untuk StringVar, BooleanVar, dll
-                var.trace('w', lambda *args: self._throttled_save())
+                trace_id = var.trace('w', create_trace_callback(self._throttled_save))
+                self._trace_ids.append((var, trace_id))
 
         # Create scrollable main container
         self.main_frame = ctk.CTkScrollableFrame(
@@ -161,11 +178,17 @@ class RenamergedGUI:
     
     def _throttled_save(self):
         """Save settings dengan delay untuk menghindari terlalu sering save"""
-        if self._save_timer:
-            self._save_timer.cancel()
-        
-        self._save_timer = threading.Timer(1.0, self.save_current_settings)  # Delay 1 detik
-        self._save_timer.start()
+        with self._save_timer_lock:
+            if self._save_timer and self._save_timer.is_alive():
+                self._save_timer.cancel()
+                try:
+                    self._save_timer.join(timeout=0.1)  # Wait briefly for timer to finish
+                except:
+                    pass
+            
+            self._save_timer = threading.Timer(1.0, self.save_current_settings)
+            self._save_timer.daemon = True  # Make timer thread daemon
+            self._save_timer.start()
     
     def save_current_settings(self):
         """Simpan settings saat ini ke file (tanpa path yang bersifat session-specific)"""
@@ -184,14 +207,65 @@ class RenamergedGUI:
         
         return self.settings_manager.save_settings(current_settings)
     
-    def on_closing(self):
-        """Handler ketika aplikasi ditutup - save settings terlebih dahulu"""
+    def cleanup_resources(self):
+        """Clean up all resources before closing"""
+        if self._cleanup_done:
+            return
+            
+        self._cleanup_done = True
+        
         try:
-            # Cancel any pending timer and save immediately
-            if self._save_timer:
-                self._save_timer.cancel()
+            # Cancel and wait for timer thread
+            with self._save_timer_lock:
+                if self._save_timer and self._save_timer.is_alive():
+                    self._save_timer.cancel()
+                    try:
+                        self._save_timer.join(timeout=2.0)
+                    except:
+                        pass
+                        
+            # Clean up any background threads
+            for thread in self._background_threads:
+                if thread and thread.is_alive():
+                    try:
+                        if hasattr(thread, 'cancel'):
+                            thread.cancel()
+                        thread.join(timeout=1.0)
+                    except:
+                        pass
+                        
+            # Save settings immediately
             self.save_current_settings()
+            
+            # Clean up trace callbacks to prevent memory leaks
+            for var, trace_id in self._trace_ids:
+                try:
+                    var.trace_vdelete('w', trace_id)
+                except:
+                    pass
+            self._trace_ids.clear()
+            
+            # Close any open file handles in components
+            if hasattr(self, 'pdf_counter') and self.pdf_counter:
+                self.pdf_counter.stop_monitoring()
+                
         except Exception as e:
-            print(f"Error saving settings on close: {str(e)}")
+            # Use logging instead of print for GUI apps
+            try:
+                log_message(f"Error during cleanup: {str(e)}", Fore.RED)
+            except:
+                pass
+    
+    def on_closing(self):
+        """Handler ketika aplikasi ditutup"""
+        try:
+            self.cleanup_resources()
         finally:
-            self.root.destroy()
+            try:
+                self.root.quit()  # Stop mainloop
+            except:
+                pass
+            try:
+                self.root.destroy()  # Destroy window
+            except:
+                pass

@@ -1,10 +1,15 @@
 import json
 import os
+import threading
+import time
 from src.utils.utils import log_message, Fore
 
 class SettingsManager:
     def __init__(self, settings_file="user_settings.json"):
         self.settings_file = settings_file
+        self._save_lock = threading.Lock()
+        self._last_save_time = 0
+        self._min_save_interval = 0.5  # Minimum 500ms between saves
         self.default_settings = {
             "mode": "Rename Saja",
             "use_name": True,
@@ -45,27 +50,48 @@ class SettingsManager:
             return self.default_settings.copy()
     
     def save_settings(self, settings_dict, log_callback=None):
-        """Simpan user settings ke file"""
-        try:
-            # Konversi settings GUI ke format yang bisa disimpan
-            saveable_settings = {}
-            
-            for key, value in settings_dict.items():
-                if hasattr(value, 'get'):  # Tkinter variable
-                    saveable_settings[key] = value.get()
+        """Simpan user settings ke file dengan race condition protection"""
+        with self._save_lock:
+            try:
+                # Throttle save operations
+                current_time = time.time()
+                if current_time - self._last_save_time < self._min_save_interval:
+                    return True  # Skip save if too frequent
+                
+                # Konversi settings GUI ke format yang bisa disimpan
+                saveable_settings = {}
+                
+                for key, value in settings_dict.items():
+                    if hasattr(value, 'get'):  # Tkinter variable
+                        saveable_settings[key] = value.get()
+                    else:
+                        saveable_settings[key] = value
+                
+                # Atomic write: write to temp file first, then rename
+                temp_file = self.settings_file + '.tmp'
+                with open(temp_file, 'w', encoding='utf-8') as f:
+                    json.dump(saveable_settings, f, indent=2, ensure_ascii=False)
+                
+                # Atomic rename
+                if os.path.exists(self.settings_file):
+                    os.replace(temp_file, self.settings_file)
                 else:
-                    saveable_settings[key] = value
-            
-            # Simpan ke file dengan pretty formatting
-            with open(self.settings_file, 'w', encoding='utf-8') as f:
-                json.dump(saveable_settings, f, indent=2, ensure_ascii=False)
-            
-            log_message("Settings user berhasil disimpan", Fore.GREEN, log_callback=log_callback)
-            return True
-            
-        except Exception as e:
-            log_message(f"Error saving settings: {str(e)}", Fore.RED, log_callback=log_callback)
-            return False
+                    os.rename(temp_file, self.settings_file)
+                
+                self._last_save_time = current_time
+                log_message("Settings user berhasil disimpan", Fore.GREEN, log_callback=log_callback)
+                return True
+                
+            except Exception as e:
+                log_message(f"Error saving settings: {str(e)}", Fore.RED, log_callback=log_callback)
+                # Clean up temp file if exists
+                temp_file = self.settings_file + '.tmp'
+                if os.path.exists(temp_file):
+                    try:
+                        os.remove(temp_file)
+                    except:
+                        pass
+                return False
     
     def get_default_settings(self):
         """Return default settings"""

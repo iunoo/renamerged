@@ -2,6 +2,7 @@ import customtkinter as ctk
 import tkinter as tk
 import os
 import time
+import threading
 from tkinter import messagebox
 from src.pdf.pdf_processor import process_pdfs as process_pdfs_merge
 from src.pdf.pdf_processor_rename import process_pdfs as process_pdfs_rename
@@ -21,87 +22,264 @@ class ProcessButtonComponent:
         self.output_location = output_location
         self.mode_selection = mode_selection
         self.gui = gui
+        
+        # Processing thread management
+        self.processing_thread = None
+        self.cancel_flag = threading.Event()
+        self.processing_lock = threading.Lock()
 
         # No UI creation - this component now only provides logic
         # The actual button is created in FileInputOutputComponent
 
     def process(self):
+        """Start processing in background thread or cancel if already running"""
+        with self.processing_lock:
+            if self.processing_thread and self.processing_thread.is_alive():
+                # Cancel current processing
+                self.cancel_processing()
+                return
+            
+            # Start new processing
+            self._start_processing()
+    
+    def _start_processing(self):
+        """Initialize and start processing thread"""
         input_dir = self.input_path_var.get()
         output_dir = self.output_path_var.get()
         mode = self.mode_var.get()
 
-        if not input_dir or not isinstance(input_dir, str):
+        # Enhanced path validation
+        if not input_dir or not isinstance(input_dir, str) or input_dir.strip() == "":
             messagebox.showerror("Error", "Pilih folder input terlebih dahulu!")
             return
+            
+        # Normalize path and check existence
+        input_dir = os.path.normpath(input_dir.strip())
+        if not os.path.exists(input_dir):
+            messagebox.showerror("Error", "Folder input tidak ditemukan!")
+            return
+            
         if not os.path.isdir(input_dir):
-            messagebox.showerror("Error", "Folder input tidak valid! Pilih folder yang benar.")
+            messagebox.showerror("Error", "Path yang dipilih bukan folder!")
+            return
+            
+        # Check read permissions
+        if not os.access(input_dir, os.R_OK):
+            messagebox.showerror("Error", "Tidak memiliki izin untuk membaca folder input!")
+            return
+            
+        # Check if directory is empty of PDF files
+        try:
+            pdf_files = [f for f in os.listdir(input_dir) if f.lower().endswith('.pdf')]
+            if not pdf_files:
+                messagebox.showwarning("Warning", "Tidak ada file PDF ditemukan di folder input!")
+                return
+        except (PermissionError, OSError) as e:
+            messagebox.showerror("Error", f"Error mengakses folder input: {str(e)}")
             return
 
-        self.set_button_state("disabled")
+        # Reset cancel flag and update UI
+        self.cancel_flag.clear()
+        self.set_button_text("❌ Cancel")
+        self.set_button_state("normal")
 
         if not output_dir or output_dir.strip() == "":
             output_dir = os.path.join(input_dir, "ProcessedPDFs")
             os.makedirs(output_dir, exist_ok=True)
             self.output_path_var.set(output_dir)
 
-        required_keys = ["use_name", "use_date", "use_reference", "use_faktur"]
-        for key in required_keys:
-            if not hasattr(self.settings.get(key), 'get'):
-                messagebox.showerror("Error", f"Pengaturan {key} tidak valid!")
-                self.set_button_state("normal")
-                return
-
-        self.settings["component_order"] = self.mode_selection.get_component_order()
-        self.settings["separator"] = self.mode_selection.get_separator()
-        self.settings["slash_replacement"] = self.mode_selection.get_slash_replacement()
-
-        log_message(f"Debug: Pengaturan - component_order: {self.settings['component_order']}, "
-                    f"use_name: {self.settings['use_name'].get()}, use_date: {self.settings['use_date'].get()}, "
-                    f"use_reference: {self.settings['use_reference'].get()}, use_faktur: {self.settings['use_faktur'].get()}, "
-                    f"separator: '{self.settings['separator']}', slash_replacement: '{self.settings['slash_replacement']}'", 
-                    Fore.CYAN)
-
-        # Check for long filenames before processing
-        from src.utils.filename_checker import check_long_filenames
-        from src.components.filename_warning_dialog import FilenameWarningDialog
+        # Start background processing thread
+        self.processing_thread = threading.Thread(
+            target=self._process_in_background,
+            args=(input_dir, output_dir, mode),
+            daemon=True
+        )
+        self.processing_thread.start()
         
-        has_long_filenames, long_filenames, sample_filenames = check_long_filenames(input_dir, self.settings, self.log_callback)
+        # Track thread in GUI for cleanup
+        if hasattr(self.gui, '_background_threads'):
+            self.gui._background_threads.append(self.processing_thread)
+    
+    def _process_in_background(self, input_dir, output_dir, mode):
+        """Background processing method"""
+        try:
+            # Validate settings
+            required_keys = ["use_name", "use_date", "use_reference", "use_faktur"]
+            for key in required_keys:
+                if not hasattr(self.settings.get(key), 'get'):
+                    self._show_error_safe("Error", f"Pengaturan {key} tidak valid!")
+                    return
+
+            self.settings["component_order"] = self.mode_selection.get_component_order()
+            self.settings["separator"] = self.mode_selection.get_separator()
+            self.settings["slash_replacement"] = self.mode_selection.get_slash_replacement()
+
+            # Check for long filenames before processing
+            from src.utils.filename_checker import check_long_filenames
+            from src.components.filename_warning_dialog import FilenameWarningDialog
         
-        if has_long_filenames:
-            # Show simple warning dialog
-            dialog = FilenameWarningDialog(self.parent, self.gui.colors, len(long_filenames))
-            user_choice = dialog.show_warning()
+            has_long_filenames, long_filenames, sample_filenames = check_long_filenames(input_dir, self.settings, self.log_callback)
             
-            if user_choice == "cancel":
-                log_message("Proses dibatalkan oleh user karena filename terlalu panjang", Fore.YELLOW, log_callback=self.log_callback)
-                self.set_button_state("normal")
-                return
-            elif user_choice == "ok":
-                # Set default max length (150 karakter - apply for all)
-                self.settings["max_filename_length"] = 150
-                log_message(f"User memilih melanjutkan dengan penyesuaian referensi otomatis (max 150 karakter, berlaku untuk semua file)", Fore.CYAN, log_callback=self.log_callback)
+            if has_long_filenames and not self.cancel_flag.is_set():
+                # Handle filename dialog on main thread
+                dialog_result = [None]
+                
+                def show_dialog():
+                    dialog = FilenameWarningDialog(self.parent, self.gui.colors, len(long_filenames))
+                    dialog_result[0] = dialog.show_warning()
+                
+                self.parent.after(0, show_dialog)
+                
+                # Wait for dialog result
+                while dialog_result[0] is None and not self.cancel_flag.is_set():
+                    time.sleep(0.1)
+                    
+                if self.cancel_flag.is_set():
+                    return
+                    
+                if dialog_result[0] == "cancel":
+                    log_message("Proses dibatalkan oleh user karena filename terlalu panjang", Fore.YELLOW, log_callback=self.log_callback)
+                    self._reset_button_safe()
+                    return
+                elif dialog_result[0] == "ok":
+                    self.settings["max_filename_length"] = 150
+                    log_message(f"User memilih melanjutkan dengan penyesuaian referensi otomatis (max 150 karakter, berlaku untuk semua file)", Fore.CYAN, log_callback=self.log_callback)
 
+            # Check for cancellation
+            if self.cancel_flag.is_set():
+                return
+
+            # Reset UI on main thread
+            self.parent.after(0, self._reset_ui_for_processing)
+
+            # Actual PDF processing with cancellation support
+            try:
+                if self.cancel_flag.is_set():
+                    return
+                    
+                if mode == "Rename dan Merge":
+                    total, renamed, merged, errors = process_pdfs_merge(
+                        input_dir, output_dir, self._thread_safe_progress_callback, 
+                        self.log_callback, self.settings, self.cancel_flag
+                    )
+                else:
+                    total, renamed, merged, errors = process_pdfs_rename(
+                        input_dir, output_dir, self._thread_safe_progress_callback, 
+                        self.log_callback, self.settings, self.cancel_flag
+                    )
+
+                if not self.cancel_flag.is_set():
+                    # Update UI on main thread
+                    self.parent.after(0, lambda: self.statistics.update_statistics(total, renamed, merged, errors))
+                    self.parent.after(0, lambda: self.output_location.set_output_path(output_dir))
+                    # Force progress to 100% completion - this should always work
+                    def force_complete():
+                        log_message("🎯 Forcing progress to 100% completion", Fore.GREEN, log_callback=self.log_callback)
+                        self._set_progress_complete()
+                    self.parent.after(100, force_complete)  # Small delay to ensure it's the last update
+
+            except (FileNotFoundError, PermissionError) as e:
+                if not self.cancel_flag.is_set():
+                    error_message = f"File access error: {str(e)}\n\nSolusi:\n• Periksa izin akses folder\n• Pastikan file tidak sedang dibuka aplikasi lain\n• Jalankan sebagai administrator jika perlu"
+                    self._show_error_safe("File Access Error", error_message)
+                    log_message(f"File access error: {str(e)}", Fore.RED, log_callback=self.log_callback)
+            except (IOError, OSError) as e:
+                if not self.cancel_flag.is_set():
+                    error_message = f"I/O error: {str(e)}\n\nSolusi:\n• Periksa ruang disk tersedia\n• Pastikan path folder valid\n• Restart aplikasi jika perlu"
+                    self._show_error_safe("I/O Error", error_message)
+                    log_message(f"I/O error: {str(e)}", Fore.RED, log_callback=self.log_callback)
+            except MemoryError as e:
+                if not self.cancel_flag.is_set():
+                    error_message = "Memory error: Tidak cukup memori untuk memproses file.\n\nSolusi:\n• Tutup aplikasi lain\n• Proses file dalam batch kecil\n• Restart komputer jika perlu"
+                    self._show_error_safe("Memory Error", error_message)
+                    log_message(f"Memory error: {str(e)}", Fore.RED, log_callback=self.log_callback)
+            except Exception as e:
+                if not self.cancel_flag.is_set():
+                    error_message = self.get_detailed_error_message(e)
+                    self._show_error_safe("Unexpected Error", error_message)
+                    log_message(f"Unexpected error: {str(e)}", Fore.RED, log_callback=self.log_callback)
+        
+        except Exception as e:
+            # Outer exception handler for background thread setup errors
+            if not self.cancel_flag.is_set():
+                self._show_error_safe("Error", f"Failed to start processing: {str(e)}")
+                log_message(f"Processing setup error: {str(e)}", Fore.RED, log_callback=self.log_callback)
+        finally:
+            # Always reset button when processing is done/cancelled
+            self._reset_button_safe()
+
+    def cancel_processing(self):
+        """Cancel current processing"""
+        if self.processing_thread and self.processing_thread.is_alive():
+            log_message("🛑 Membatalkan proses...", Fore.YELLOW, log_callback=self.log_callback)
+            self.cancel_flag.set()
+            
+            # Give thread some time to finish gracefully
+            self.processing_thread.join(timeout=2.0)
+            
+            if self.processing_thread.is_alive():
+                log_message("⚠️ Thread tidak merespons, proses mungkin masih berjalan di background", Fore.YELLOW, log_callback=self.log_callback)
+            else:
+                log_message("✅ Proses berhasil dibatalkan", Fore.GREEN, log_callback=self.log_callback)
+    
+    def _reset_ui_for_processing(self):
+        """Reset UI elements for processing start"""
         self.statistics.reset()
         self.progress_var.set(0)
         self.progress_percentage_var.set("0%")
         self.gui.progress_bar.set_progress(0)
-        self.parent.update_idletasks()
-
-        try:
-            if mode == "Rename dan Merge":
-                total, renamed, merged, errors = process_pdfs_merge(input_dir, output_dir, self.progress_callback, self.log_callback, self.settings)
+    
+    def _set_progress_complete(self):
+        """Set progress to 100% completion"""
+        self.gui.progress_bar.set_progress(1.0)
+        self.progress_var.set(100)
+        self.progress_percentage_var.set("100%")
+    
+    def _reset_button_safe(self):
+        """Thread-safe button reset"""
+        def reset_button():
+            self.set_button_text("🚀 Mulai Proses")
+            self.set_button_state("normal")
+            # Progress should already be at 100% from completion
+        
+        self.parent.after(0, reset_button)
+    
+    def _show_error_safe(self, title, message):
+        """Thread-safe error dialog"""
+        self.parent.after(0, lambda: messagebox.showerror(title, message))
+    
+    def _thread_safe_progress_callback(self, stage, current, total_files, total_to_merge, total_to_finalize):
+        """Thread-safe progress callback"""
+        if self.cancel_flag.is_set():
+            return  # Stop updating progress if cancelled
+            
+        # Debug logging
+        log_message(f"Progress Debug: stage={stage}, current={current}, total_files={total_files}, total_to_merge={total_to_merge}, total_to_finalize={total_to_finalize}", Fore.CYAN, log_callback=self.log_callback)
+            
+        # Calculate progress same as before
+        if stage == "reading":
+            percentage = (current / max(total_files, 1)) * 40
+        elif stage == "processing":
+            percentage = 40 + (current / max(total_to_merge, 1)) * 40
+        else:  # finalizing
+            if total_to_finalize > 0:
+                percentage = 80 + (current / total_to_finalize) * 20
             else:
-                total, renamed, merged, errors = process_pdfs_rename(input_dir, output_dir, self.progress_callback, self.log_callback, self.settings)
+                percentage = 100  # If no finalization needed, go to 100%
 
-            self.statistics.update_statistics(total, renamed, merged, errors)
-            self.output_location.set_output_path(output_dir)
+        percentage = min(max(percentage, 0), 100)
+        normalized_progress = percentage / 100
+        
+        log_message(f"Progress calculated: {percentage:.1f}%", Fore.CYAN, log_callback=self.log_callback)
 
-        except Exception as e:
-            error_message = self.get_detailed_error_message(e)
-            messagebox.showerror("Error", error_message)
-            log_message(f"Error detail: {str(e)}", Fore.RED, log_callback=self.log_callback)
-        finally:
-            self.process_btn.configure(state="normal")
+        # Update UI on main thread
+        def update_ui():
+            if not self.cancel_flag.is_set():
+                self.gui.progress_bar.set_progress(normalized_progress)
+                self.progress_var.set(percentage)
+                self.progress_percentage_var.set(f"{percentage:.1f}%")
+        
+        self.parent.after(0, update_ui)
 
     def log_callback(self, message):
         if self.statistics:
@@ -197,3 +375,8 @@ class ProcessButtonComponent:
         """Enable or disable the process button through GUI reference"""
         if hasattr(self.gui, 'file_input_output') and hasattr(self.gui.file_input_output, 'process_btn'):
             self.gui.file_input_output.process_btn.configure(state=state)
+    
+    def set_button_text(self, text):
+        """Set button text through GUI reference"""
+        if hasattr(self.gui, 'file_input_output') and hasattr(self.gui.file_input_output, 'process_btn'):
+            self.gui.file_input_output.process_btn.configure(text=text)

@@ -204,7 +204,16 @@ class FileInputOutputComponent:
         select_btn = ctk.CTkButton(button_frame, text="Pilih", command=lambda: self._select_folder(popup, folder_path_var))
         select_btn.pack(side="right", padx=5)
 
-        folder_path_var.trace("w", lambda *args: self._update_preview(folder_path_var, file_list, total_pdf_var))
+        trace_id = folder_path_var.trace("w", lambda *args: self._update_preview(folder_path_var, file_list, total_pdf_var))
+        
+        # Store trace ID for cleanup when popup is destroyed
+        def cleanup_trace():
+            try:
+                folder_path_var.trace_vdelete("w", trace_id)
+            except:
+                pass
+        
+        popup.protocol("WM_DELETE_WINDOW", lambda: (cleanup_trace(), popup.destroy()))
         popup.update_idletasks()
 
     def _browse_folder(self, popup, folder_path_var):

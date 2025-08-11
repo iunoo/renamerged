@@ -12,7 +12,10 @@ def validate_pdf(pdf_path):
             if pdf.pages:
                 return True
         return False
-    except Exception as e:
+    except (IOError, OSError, ImportError, AttributeError) as e:
+        return False
+    except Exception:
+        # Unknown error, PDF is likely invalid
         return False
 
 def extract_info_from_pdf(pdf_path, log_callback=None):
@@ -49,7 +52,6 @@ def extract_info_from_pdf(pdf_path, log_callback=None):
         
         if faktur_number == "" or not faktur_number:
             faktur_number = "NoFaktur"
-        log_message(f"Debug: Ekstraksi nomor faktur dari {os.path.basename(pdf_path)}: '{faktur_number}'", Fore.CYAN, log_callback=log_callback)
 
         # Perbaikan regex referensi: menangani multi-line dan posisi tidak stabil
         # Pattern yang lebih fleksibel untuk menangkap referensi yang bisa multi-line
@@ -85,12 +87,19 @@ def extract_info_from_pdf(pdf_path, log_callback=None):
             if len(reference) > 200:
                 reference = reference[:200].strip()
         
-        log_message(f"Debug: Ekstraksi referensi dari {os.path.basename(pdf_path)}: '{reference}'", Fore.CYAN, log_callback=log_callback)
 
         return id_tku_seller, partner_name, faktur_number, date, reference
+    except (FileNotFoundError, PermissionError) as e:
+        if log_callback:
+            log_callback(f"❌ File access error {os.path.basename(pdf_path)}: {str(e)}")
+        raise
+    except (ImportError, AttributeError) as e:
+        if log_callback:
+            log_callback(f"❌ PDF library error {os.path.basename(pdf_path)}: {str(e)}")
+        raise
     except Exception as e:
         if log_callback:
-            log_callback(f"❌ Error membaca {os.path.basename(pdf_path)}: {str(e)}")
+            log_callback(f"❌ Unexpected error reading {os.path.basename(pdf_path)}: {str(e)}")
         raise
 
 def generate_filename(partner_name, faktur_number, date, reference, settings, component_order=None, separator="-", slash_replacement="_", max_length=None):
@@ -113,7 +122,6 @@ def generate_filename(partner_name, faktur_number, date, reference, settings, co
         "Nomor Faktur Pajak": (faktur_number, settings.get("use_faktur"))
     }
 
-    log_message(f"Debug: Komponen yang dipilih - {[(name, var.get() if hasattr(var, 'get') else False) for name, (_, var) in component_values.items()]}", Fore.CYAN)
 
     if component_order:
         for component_name in component_order:
@@ -121,23 +129,18 @@ def generate_filename(partner_name, faktur_number, date, reference, settings, co
             if var and hasattr(var, 'get') and var.get():
                 # Validasi nilai untuk Nomor Faktur Pajak
                 if component_name == "Nomor Faktur Pajak" and value == "NoFaktur":
-                    log_message(f"Debug: Mengabaikan Nomor Faktur Pajak karena tidak valid: {value}", Fore.YELLOW)
                     continue
                 parts.append(value)
-                log_message(f"Debug: Menambahkan komponen {component_name}: {value}", Fore.CYAN)
     else:
         for key, (value, var) in component_values.items():
             if var and hasattr(var, 'get') and var.get():
                 # Validasi nilai untuk Nomor Faktur Pajak
                 if key == "Nomor Faktur Pajak" and value == "NoFaktur":
-                    log_message(f"Debug: Mengabaikan Nomor Faktur Pajak karena tidak valid: {value}", Fore.YELLOW)
                     continue
                 parts.append(value)
-                log_message(f"Debug: Menambahkan komponen default {key}: {value}", Fore.CYAN)
 
     if not parts:
         parts.append("unnamed")
-        log_message("Debug: Tidak ada komponen yang dipilih, menggunakan 'unnamed'", Fore.YELLOW)
 
     filename = separator.join(parts) + ".pdf"
     
@@ -149,7 +152,6 @@ def generate_filename(partner_name, faktur_number, date, reference, settings, co
         max_filename_length = 130  # Default conservative untuk semua separator
     
     if len(filename) > max_filename_length:
-        log_message(f"Debug: Filename terlalu panjang ({len(filename)} chars), memotong ke {max_filename_length} chars", Fore.YELLOW)
         
         extension = ".pdf"
         available_length = max_filename_length - len(extension)
@@ -230,7 +232,6 @@ def generate_filename(partner_name, faktur_number, date, reference, settings, co
             filename_without_ext = filename[:-4]  # Remove .pdf
             filename = filename_without_ext[:available_length-3] + "....pdf"
         
-        log_message(f"Debug: Filename setelah dipotong: '{filename}' ({len(filename)} chars)", Fore.YELLOW)
     
     return filename
 
@@ -238,24 +239,121 @@ def copy_file_with_unique_name(source_path, destination_path, log_callback=None)
     """Menyalin file ke lokasi tujuan dengan menambahkan nomor unik jika file sudah ada."""
     counter = 1
     original_destination = destination_path
-    while os.path.exists(destination_path):
+    max_attempts = 1000  # Safety limit to prevent infinite loop
+    
+    while os.path.exists(destination_path) and counter <= max_attempts:
         base, ext = os.path.splitext(original_destination)
         destination_path = f"{base} ({counter}){ext}"
         counter += 1
+    
+    # If we hit the max attempts, use timestamp to ensure uniqueness
+    if counter > max_attempts:
+        import time
+        timestamp = int(time.time())
+        base, ext = os.path.splitext(original_destination)
+        destination_path = f"{base}__{timestamp}{ext}"
+        log_message(f"⚠️ Hit max naming attempts, using timestamp for {os.path.basename(destination_path)}", Fore.YELLOW, log_callback=log_callback)
 
-    shutil.copy(source_path, destination_path)
-    log_message(f"📂 {os.path.basename(destination_path)} dipindahkan ke {os.path.dirname(destination_path)}", Fore.BLUE, log_callback=log_callback)
-    return 1
+    try:
+        # Check if source file is accessible and not locked
+        if not os.access(source_path, os.R_OK):
+            raise PermissionError(f"Cannot read source file: {source_path}")
+            
+        # Check if destination directory is writable
+        dest_dir = os.path.dirname(destination_path)
+        if not os.access(dest_dir, os.W_OK):
+            raise PermissionError(f"Cannot write to destination directory: {dest_dir}")
+        
+        # Try to detect if file is locked by attempting to open it
+        try:
+            with open(source_path, 'rb') as test_file:
+                # Try to read first few bytes to ensure file is not locked
+                test_file.read(1024)
+        except (PermissionError, IOError) as e:
+            if "being used by another process" in str(e) or "access denied" in str(e).lower():
+                raise IOError(f"File {os.path.basename(source_path)} is currently open in another application. Please close it and try again.")
+            raise
+        
+        # Perform the actual copy with retry mechanism
+        max_retries = 3
+        retry_delay = 0.5
+        
+        for attempt in range(max_retries):
+            try:
+                shutil.copy2(source_path, destination_path)  # copy2 preserves metadata
+                log_message(f"📂 {os.path.basename(destination_path)} dipindahkan ke {os.path.dirname(destination_path)}", Fore.BLUE, log_callback=log_callback)
+                return 1
+                
+            except (PermissionError, IOError) as e:
+                if attempt < max_retries - 1:
+                    import time
+                    log_message(f"⚠️ Copy attempt {attempt + 1} failed, retrying in {retry_delay}s...", Fore.YELLOW, log_callback=log_callback)
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                    continue
+                else:
+                    raise
+                    
+    except PermissionError as e:
+        log_message(f"❌ Permission error copying {os.path.basename(source_path)}: {str(e)}", Fore.RED, log_callback=log_callback)
+        raise
+    except (IOError, OSError, shutil.Error) as e:
+        log_message(f"❌ Error copying file {os.path.basename(source_path)}: {str(e)}", Fore.RED, log_callback=log_callback)
+        raise
 
 def merge_pdfs(pdf_paths, output_path, log_callback=None):
     """Menggabungkan beberapa file PDF menjadi satu file."""
+    merger = None
+    pdf_readers = []
+    
     try:
         merger = PdfWriter()
+        
+        # Open each PDF file and keep track of readers
         for pdf_path in pdf_paths:
-            merger.append(pdf_path)
-        merger.write(output_path)
-        merger.close()
+            try:
+                reader = PdfReader(pdf_path)
+                pdf_readers.append(reader)
+                for page in reader.pages:
+                    merger.add_page(page)
+            except (FileNotFoundError, PermissionError) as e:
+                log_message(f"⚠️ File access error {os.path.basename(pdf_path)}: {str(e)}", Fore.YELLOW, log_callback=log_callback)
+                continue
+            except (ImportError, AttributeError) as e:
+                log_message(f"⚠️ PDF library error {os.path.basename(pdf_path)}: {str(e)}", Fore.YELLOW, log_callback=log_callback)
+                continue
+            except Exception as e:
+                log_message(f"⚠️ Unexpected error reading {os.path.basename(pdf_path)}: {str(e)}", Fore.YELLOW, log_callback=log_callback)
+                continue
+                
+        # Write merged PDF
+        with open(output_path, 'wb') as output_file:
+            merger.write(output_file)
+            
         log_message(f"✅ File digabungkan ke {output_path}", Fore.GREEN, log_callback=log_callback)
-    except Exception as e:
-        log_message(f"❌ Gagal merge {os.path.basename(output_path)}: {str(e)}", Fore.RED, log_callback=log_callback)
+        
+    except (FileNotFoundError, PermissionError) as e:
+        log_message(f"❌ File access error during merge {os.path.basename(output_path)}: {str(e)}", Fore.RED, log_callback=log_callback)
         raise
+    except (IOError, OSError) as e:
+        log_message(f"❌ I/O error during merge {os.path.basename(output_path)}: {str(e)}", Fore.RED, log_callback=log_callback)
+        raise
+    except Exception as e:
+        log_message(f"❌ Unexpected error during merge {os.path.basename(output_path)}: {str(e)}", Fore.RED, log_callback=log_callback)
+        raise
+        
+    finally:
+        # Explicitly close all resources
+        if merger:
+            try:
+                merger.close()
+            except:
+                pass
+                
+        # Close all PDF readers
+        for reader in pdf_readers:
+            try:
+                if hasattr(reader, 'stream') and reader.stream:
+                    reader.stream.close()
+            except:
+                pass

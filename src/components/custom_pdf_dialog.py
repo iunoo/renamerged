@@ -77,7 +77,7 @@ class CustomPDFDialog:
         self.cancel_btn.pack(side="right", padx=5)
 
         # Bind path entry untuk update file list saat path berubah
-        self.path_var.trace("w", self._on_path_changed)
+        self.path_trace_id = self.path_var.trace("w", self._on_path_changed)
 
         # Mulai thread untuk memuat file list
         self._load_file_list_async()
@@ -85,6 +85,11 @@ class CustomPDFDialog:
     def _on_closing(self):
         """Dipanggil saat dialog ditutup."""
         self.dialog_open = False
+        # Clean up trace callback
+        try:
+            self.path_var.trace_vdelete("w", self.path_trace_id)
+        except:
+            pass
         self.dialog.destroy()
 
     def _on_path_changed(self, *args):
